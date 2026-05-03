@@ -1,12 +1,4 @@
-"""Runs the official Mateen pipeline given pre-loaded train/test data.
-
-Wraps `MateenUtils.main.adaptive_ensemble` so we can:
-  - inject device (MPS) before any model construction
-  - re-seed deterministically per trial
-  - skip the disk-load step (pass data as in-memory arrays)
-
-Returns predictions + per-window probabilities + headline metrics.
-"""
+"""Wraps the official Mateen pipeline given pre-loaded train/test arrays."""
 from __future__ import annotations
 import argparse
 import random
@@ -17,11 +9,10 @@ from typing import Optional
 import numpy as np
 import torch
 
-import device as device_mod  # patches the official `device` constants
+import device as device_mod
 from data_loader import Split, partition_test
 
 
-# ----------- args object that matches the official CLI ------------- #
 @dataclass
 class MateenArgs:
     dataset_name: str = "IDS2017"
@@ -35,21 +26,8 @@ class MateenArgs:
     shift_threshold: float = 0.05
 
 
-# ----------- headline metrics (paper convention + attack-side) ----- #
 def headline_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
-    """Compute BOTH the paper's metrics (positive=benign) and proper
-    attack-detection metrics (positive=attack).
-
-    The paper's `getResult` swaps the confusion matrix so the
-    "positive" class is benign. That is what its F1/Acc/mF1 numbers in
-    Table 2 are. We reproduce those for paper-vs-ours comparison.
-
-    But on a 65/35 benign-skewed test set, "high benign-F1" can be hit
-    by a near-trivial always-benign classifier — so we ALSO compute
-    attack-as-positive Recall/Precision/F1 + the FPR / TPR pair, plus
-    the prediction-distribution counts, so we can spot collapse to
-    one-class.
-    """
+    """Paper-style (positive=benign) plus attack-detection metrics."""
     from sklearn.metrics import (
         confusion_matrix,
         f1_score,
@@ -59,28 +37,20 @@ def headline_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
     )
 
     cm = confusion_matrix(y_true, y_pred, labels=[0, 1])
-    # cm is [[tn_attack, fp_attack], [fn_attack, tp_attack]] with the
-    # convention that label=1 is the positive class. Equivalently:
-    #   tn (true benign) = cm[0,0]
-    #   fp (false attack flag on benign) = cm[0,1]
-    #   fn (missed attack)               = cm[1,0]
-    #   tp (caught attack)               = cm[1,1]
     tn, fp, fn, tp = cm[0, 0], cm[0, 1], cm[1, 0], cm[1, 1]
 
     n_benign = tn + fp
     n_attack = tp + fn
     accuracy = (tp + tn) / max(1, tp + tn + fp + fn)
 
-    # Attack-as-positive (the metrics we actually care about for IDS):
-    attack_recall = tp / max(1, n_attack)            # = TPR
+    attack_recall = tp / max(1, n_attack)
     attack_precision = tp / max(1, tp + fp)
     attack_f1 = 2 * attack_precision * attack_recall / max(
         1e-12, attack_precision + attack_recall
     )
-    fpr = fp / max(1, n_benign)                      # benign mis-flagged
+    fpr = fp / max(1, n_benign)
 
-    # Benign-as-positive (paper convention: maps to its F1 / mF1 / Acc):
-    benign_recall = tn / max(1, n_benign)            # = 1 - FPR
+    benign_recall = tn / max(1, n_benign)
     benign_precision = tn / max(1, tn + fn)
     benign_f1 = 2 * benign_precision * benign_recall / max(
         1e-12, benign_precision + benign_recall
@@ -92,38 +62,28 @@ def headline_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
     bal_acc = balanced_accuracy_score(y_true, y_pred)
 
     return dict(
-        # Paper's headline (benign as positive):
         accuracy=float(accuracy),
-        f1_paper=float(benign_f1),                # paper "F1"
-        macro_f1=float(macro_f1),                  # paper "mF1"
-        # Attack-detection (the IDS-meaningful ones):
-        attack_recall=float(attack_recall),       # TPR
+        f1_paper=float(benign_f1),
+        macro_f1=float(macro_f1),
+        attack_recall=float(attack_recall),
         attack_precision=float(attack_precision),
         attack_f1=float(attack_f1),
         fpr=float(fpr),
         tpr=float(attack_recall),
-        # Benign-side (companion to attack-side):
         benign_recall=float(benign_recall),
         benign_precision=float(benign_precision),
         benign_f1=float(benign_f1),
-        # Macro:
         macro_precision=float(macro_precision),
         macro_recall=float(macro_recall),
         balanced_accuracy=float(bal_acc),
-        # Raw counts (so the reader can verify):
         tp=int(tp), fn=int(fn), fp=int(fp), tn=int(tn),
         n_benign=int(n_benign), n_attack=int(n_attack),
     )
 
 
 def auc_roc_per_chunk(y_true: np.ndarray, probs: np.ndarray, chunk: int = 50_000) -> float:
-    """Reproduce `utils.auc_roc_in_chunks` (paper's AUC-ROC).
-
-    On small-fraction training, the DAE can produce inf RMSE for some
-    test samples (MinMax extrapolation × overflow). roc_auc_score
-    rejects inf — we clip to a large finite value, which preserves the
-    rank order that AUC depends on.
-    """
+    """Window-averaged AUC-ROC matching `utils.auc_roc_in_chunks`. Clips
+    inf to a large finite to keep rank order under sklearn."""
     from sklearn.metrics import roc_auc_score
     finite_max = 1e30
     probs = np.where(np.isfinite(probs), probs,
@@ -147,11 +107,9 @@ def _set_seeds(seed: int) -> None:
     random.seed(seed)
 
 
-# ----------- run modes --------------------------------------------- #
 def run_no_update(split: Split, args: Optional[MateenArgs] = None,
                   init_epochs: int = 100, seed: int = 0) -> dict:
-    """Train DAE once on benign-train, evaluate on full test (no
-    adaptation). This is the paper's `No-Update` baseline."""
+    """Train DAE once on benign-train; evaluate on full test (no adaptation)."""
     args = args or MateenArgs()
     _set_seeds(seed)
     device_mod.patch_official_device()
@@ -186,29 +144,20 @@ def run_no_update(split: Split, args: Optional[MateenArgs] = None,
 
 def run_mateen(split: Split, args: Optional[MateenArgs] = None,
                init_epochs: int = 100, seed: int = 0) -> dict:
-    """Run the full Mateen adaptive ensemble (paper's headline)."""
+    """Run the full Mateen adaptive ensemble."""
     args = args or MateenArgs()
     _set_seeds(seed)
     device_mod.patch_official_device()
-    # Bump QoS so the macOS scheduler doesn't deprioritize us when we
-    # run as a backgrounded subprocess. Without this, MPS work can stall
-    # for minutes at a time on long-running training.
     try:
         import os, ctypes
-        # taskpolicy-like QoS bump
         libc = ctypes.CDLL(None)
-        libc.pthread_set_qos_class_self_np(0x21, 0)  # QOS_CLASS_USER_INITIATED
+        libc.pthread_set_qos_class_self_np(0x21, 0)
     except Exception:
         pass
     import main as mateen_main
 
     xs, ys = partition_test(split.x_test, split.y_test, args.window_size)
 
-    # Monkeypatch `ensemble_training` to honor our init_epochs without
-    # rewriting the official code.
-    orig_init_epochs = mateen_main.adaptive_ensemble.__defaults__
-    # Actually the official code hardcodes 100 in adaptive_ensemble's call
-    # to ensemble_training(... num_epochs=100). Override by inlining.
     preds, probs = _adaptive_ensemble_with_epochs(
         mateen_main, split.x_train, split.y_train, xs, ys, args, init_epochs
     )
@@ -226,9 +175,7 @@ def run_mateen(split: Split, args: Optional[MateenArgs] = None,
 
 def _adaptive_ensemble_with_epochs(mateen_main, x_train, y_train, x_slice,
                                     y_slice, args, init_epochs: int):
-    """Mirror of `mateen_main.adaptive_ensemble` but with parameterized
-    init_epochs (the official code hardcodes 100).
-    """
+    """Mirror of `mateen_main.adaptive_ensemble` with parameterized init_epochs."""
     import utils as mu
     model = mateen_main.ensemble_training(
         x_train, y_train=y_train, num_epochs=init_epochs,

@@ -1,8 +1,4 @@
-"""Sweep DB hyperparameters (sigma, N) and BIM variants to close the gap vs paper.
-
-Runs on full NSL-KDD. Reports TPR@5%/@15% and AUC for Manifold, DB, MANDA
-for each attack across a hyperparameter grid.
-"""
+"""Sweep DB hyperparameters (sigma, N) and BIM variants on full NSL-KDD."""
 from __future__ import annotations
 import argparse
 import json
@@ -51,7 +47,6 @@ def main(args):
                              random_state=args.seed)
     manifold.fit(X_train, y_train)
 
-    # Generate all AEs once (per attack), then sweep sigma/N
     attack_data = {}
     for attack in args.attacks:
         print(f"[gen] {attack} ...")
@@ -77,7 +72,6 @@ def main(args):
         x_ae = x_adv[success]
         print(f"      {attack}: success={success.mean():.4f}  n_successful={n_succ}")
 
-        # Build detection set: equal clean samples
         rng = np.random.default_rng(args.seed + hash(attack) % 1000)
         clean_idx = rng.choice(Xc.shape[0], size=min(n_succ, Xc.shape[0]), replace=False)
         X_det = np.concatenate([x_ae, Xc[clean_idx]], axis=0)
@@ -135,11 +129,7 @@ def main(args):
 
 def bim_early_stop(model, x_np, y_np, diff_idx, non_diff_idx, feature_ranges,
                    p=0.05, n_steps=20, alpha_frac=0.1, device="cpu"):
-    """BIM that stops perturbing each sample once its prediction flips.
-
-    Produces minimum-perturbation AEs near the decision boundary, which is the
-    regime the DB criterion is designed for.
-    """
+    """BIM that stops perturbing each sample once its prediction flips."""
     model.eval()
     x = torch.from_numpy(x_np).to(device)
     y = torch.from_numpy(y_np).to(device)
@@ -155,11 +145,9 @@ def bim_early_stop(model, x_np, y_np, diff_idx, non_diff_idx, feature_ranges,
         logits = model(x_adv)
         loss = F.cross_entropy(logits, y, reduction="none")
         grad = torch.autograd.grad(loss.sum(), x_adv)[0]
-        # freeze flipped samples (stop perturbing)
         step = alpha * grad.sign()
         step[flipped] = 0.0
         x_new = x_adv.detach() + step
-        # project
         x_new[:, non_diff_idx_t] = x[:, non_diff_idx_t]
         delta = x_new[:, diff_idx_t] - x[:, diff_idx_t]
         per_feat_bound = p * feature_ranges_t[diff_idx_t]

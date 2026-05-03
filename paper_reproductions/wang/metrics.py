@@ -1,15 +1,10 @@
-"""Classification metrics helpers for AE detection.
-
-The detection set is balanced (n_ae == n_clean) in our pipeline, so
-accuracy/precision/recall/F1 are well-defined without class-weight bias.
-"""
+"""Classification metrics for AE detection at a target FPR."""
 from __future__ import annotations
 import numpy as np
 from sklearn.metrics import roc_curve
 
 
 def _threshold_at_fpr(y_true: np.ndarray, y_score: np.ndarray, target_fpr: float) -> float:
-    """Return score threshold with the largest TPR subject to fpr <= target."""
     fpr, tpr, thr = roc_curve(y_true, y_score)
     mask = fpr <= target_fpr
     if not mask.any():

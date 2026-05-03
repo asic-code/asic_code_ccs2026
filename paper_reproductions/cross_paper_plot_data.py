@@ -1,8 +1,4 @@
-"""Dump the minimal CSV used to draw cross_paper_summary.{pdf,png}.
-
-Output: cross_paper_plot_data.csv with one row per (work, fraction).
-Columns: work, fraction, attack_f1_mean, attack_f1_std, tpr_mean, tpr_std
-"""
+"""Dump the minimal CSV used by cross_paper_plot.py."""
 from __future__ import annotations
 import csv
 import os
@@ -12,7 +8,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "cross_paper_summary_wide.csv")
 OUT = os.path.join(HERE, "cross_paper_plot_data.csv")
 
-# (work, mode) pairs that the plot actually draws
 KEEP = [
     ("KitNET / Mirai",      "kitnet"),
     ("Mateen / CICIDS2017", "mateen"),
@@ -37,7 +32,6 @@ def main():
                 "tpr_std": r["tpr_std"],
             })
 
-    # Sort: by work order in KEEP, then fraction descending
     work_idx = {w: i for i, (w, _) in enumerate(KEEP)}
     out_rows.sort(key=lambda r: (work_idx[r["work"]], -r["fraction"]))
 

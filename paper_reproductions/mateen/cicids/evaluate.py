@@ -1,8 +1,4 @@
-"""Phase 3: single end-to-end Mateen run on CICIDS2017.
-
-Loads the full dataset, runs Mateen and No-Update, prints the
-paper-side and attack-side metrics, and saves to out/results.json.
-"""
+"""Single end-to-end Mateen run on CICIDS2017."""
 from __future__ import annotations
 import argparse
 import ctypes
@@ -12,10 +8,8 @@ import time
 
 import numpy as np
 
-# Bump QoS so the macOS scheduler doesn't deprioritize us when we run
-# as a backgrounded subprocess (otherwise MPS work stalls for minutes).
 try:
-    ctypes.CDLL(None).pthread_set_qos_class_self_np(0x21, 0)  # USER_INITIATED
+    ctypes.CDLL(None).pthread_set_qos_class_self_np(0x21, 0)
 except Exception:
     pass
 

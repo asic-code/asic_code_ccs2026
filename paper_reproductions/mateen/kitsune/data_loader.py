@@ -1,22 +1,4 @@
-"""Kitsune data loader for the Mateen reproduction.
-
-The dataset is split across two CSVs (mirroring the official
-`MateenUtils/data_processing.prepare_data("Kitsune")`):
-
-  - data/Kitsune/TrainData.csv  (≈ 1.5 GB, 751,280 rows)
-  - data/Kitsune/TestData.csv   (≈ 10.9 GB, 5,324,759 rows)
-
-Each row has 115 statistical features + a `Label` column (0=benign,
-1=attack).
-
-For the dataset-lost ablation we expose a fraction/seed knob on the
-TRAIN file only; test is untouched. MinMaxScaler refits per
-subsample.
-
-Memory: TestData.csv is large; we load with `low_memory=False` to
-avoid type mixing, but the resulting DataFrame is ≈ 5 GB in RAM. Mac
-Studio has plenty.
-"""
+"""Kitsune data loader for the Mateen reproduction."""
 from __future__ import annotations
 import hashlib
 import os
@@ -49,9 +31,9 @@ def find_kitsune_csv(name: str) -> str:
                             + "\n  ".join(_candidate_paths(name)))
 
 
-# In-process cache for the giant TestData.csv (10.9 GB on disk, ~5 GB
-# in pandas RAM). Phase 4 calls load_kitsune 18 times; without this we
-# spend ~90 min just on test-CSV I/O.
+# In-process cache for the giant TestData.csv (~5 GiB in pandas RAM).
+# Phase-4 calls load_kitsune many times; without this each call re-reads
+# both CSVs from disk.
 _TRAIN_CACHE: dict = {}
 _TEST_CACHE: dict = {}
 
@@ -111,7 +93,6 @@ def load_kitsune(
     train_full = _load_cached(train_csv, _TRAIN_CACHE)
     test_full = _load_cached(test_csv, _TEST_CACHE)
 
-    # Uniform unstratified subsample on train rows.
     rng = np.random.default_rng(seed)
     if fraction < 1.0:
         n_keep = max(1, int(round(len(train_full) * fraction)))

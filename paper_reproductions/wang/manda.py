@@ -1,8 +1,4 @@
-"""MANDA detector: Manifold + DB + Logistic-Regression combiner.
-
-Implements Algorithm 1 (Score-Compute), Algorithm 2 (Manifold),
-DB detector, and Algorithm 3 (MANDA) from the paper.
-"""
+"""MANDA detector: Manifold + DB + logistic-regression combiner."""
 from __future__ import annotations
 import numpy as np
 import torch
@@ -21,7 +17,7 @@ def _model_proba(model, x, device, batch_size=4096):
 
 
 def compute_score1(manifold_probs: np.ndarray, ids_probs: np.ndarray) -> np.ndarray:
-    """score1 = ||p|| + ||q|| - ||p+q||  (Algorithm 1, criterion 1)."""
+    """score1 = ||p|| + ||q|| - ||p+q||"""
     p = manifold_probs
     q = ids_probs
     np_ = np.linalg.norm(p, axis=1)
@@ -32,11 +28,7 @@ def compute_score1(manifold_probs: np.ndarray, ids_probs: np.ndarray) -> np.ndar
 
 def compute_score2(model, x: np.ndarray, sigma: float = 0.05, N: int = 50,
                    device: str = "cpu", batch_size: int = 1024) -> np.ndarray:
-    """score2 = (1/N) sum ||F(x_i)|| - ||(1/N) sum F(x_i)||
-
-    x_i = x + Normal(0, sigma^2) applied N times. Implements Algorithm 1
-    criterion 2.
-    """
+    """score2 = mean_i ||F(x_i)|| - ||mean_i F(x_i)||, x_i = x + N(0, sigma^2)."""
     model.eval()
     n = x.shape[0]
     out = np.zeros(n, dtype=np.float32)
@@ -45,16 +37,13 @@ def compute_score2(model, x: np.ndarray, sigma: float = 0.05, N: int = 50,
             end = min(start + batch_size, n)
             xb = torch.from_numpy(x[start:end]).to(device)
             b = xb.shape[0]
-            # Stack N noisy copies: shape (N, b, d)
             noise = torch.randn(N, b, xb.shape[1], device=device) * sigma
             noisy = (xb.unsqueeze(0) + noise).reshape(N * b, -1)
             noisy = torch.clamp(noisy, 0.0, 1.0)
             probs = F.softmax(model(noisy), dim=-1)
             probs = probs.reshape(N, b, -1)
-            # mean of L2 norm across N
-            mean_norm = probs.norm(dim=2).mean(dim=0)       # (b,)
-            # L2 norm of mean across N
-            norm_mean = probs.mean(dim=0).norm(dim=1)       # (b,)
+            mean_norm = probs.norm(dim=2).mean(dim=0)
+            norm_mean = probs.mean(dim=0).norm(dim=1)
             out[start:end] = (mean_norm - norm_mean).cpu().numpy()
     return out
 
@@ -69,7 +58,6 @@ def compute_scores(model, manifold, x: np.ndarray, sigma: float = 0.05, N: int =
 
 
 def train_manda_lr(score1: np.ndarray, score2: np.ndarray, y_adv: np.ndarray) -> LogisticRegression:
-    """Train logistic regression on [score1, score2] with AE labels y_adv in {0,1}."""
     X = np.stack([score1, score2], axis=1).astype(np.float64)
     lr = LogisticRegression(max_iter=1000)
     lr.fit(X, y_adv)

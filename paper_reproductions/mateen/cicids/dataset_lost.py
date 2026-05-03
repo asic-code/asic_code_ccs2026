@@ -1,17 +1,4 @@
-"""Phase 4 dataset-lost ablation for Mateen / CICIDS2017.
-
-Runs Mateen and No-Update at training fractions {1, 5, 10, 25, 50,
-100} % with multiple seeds per fraction. Uniform unstratified sampling
-of training rows. MinMaxScaler refit per subsample (preprocessing
-isolation). Test set fixed.
-
-Per-trial JSONL is written to out/dataset_lost/raw.jsonl. An aggregate
-mean ± std table is written to out/dataset_lost/agg.json.
-
-Tables in the printed summary lead with attack-side metrics
-(TPR / attack-F1 / FPR) — accuracy alone is misleading on benign-
-skewed CICIDS2017.
-"""
+"""Dataset-lost ablation for Mateen / CICIDS2017."""
 from __future__ import annotations
 import argparse
 import ctypes
@@ -22,10 +9,10 @@ from typing import Iterable
 
 import numpy as np
 
-# Bump QoS so the macOS scheduler doesn't deprioritize us when we run
-# as a backgrounded subprocess (otherwise MPS work stalls for minutes).
+# Bump QoS so the macOS scheduler doesn't deprioritize MPS work when run
+# as a backgrounded subprocess.
 try:
-    ctypes.CDLL(None).pthread_set_qos_class_self_np(0x21, 0)  # USER_INITIATED
+    ctypes.CDLL(None).pthread_set_qos_class_self_np(0x21, 0)
 except Exception:
     pass
 
@@ -43,9 +30,6 @@ def derived_seed(base_seed: int, fraction: float) -> int:
 
 def trial_record(mode: str, frac: float, seed: int, metrics: dict, split,
                  wall: float) -> dict:
-    # `metrics` already contains `mode` and may contain other keys we
-    # want canonical values for — strip those before merging so we
-    # don't get duplicate keyword arguments.
     m = {k: v for k, v in metrics.items() if k not in ("mode",)}
     return dict(
         mode=mode,
@@ -130,7 +114,6 @@ def main() -> None:
     rows: list[dict] = []
     args = MateenArgs()
 
-    # Resumption: re-load any (mode, fraction, seed) we already have.
     done: set = set()
     if os.path.exists(raw_path):
         with open(raw_path) as fh:
@@ -144,7 +127,6 @@ def main() -> None:
                     pass
         print(f"resumed: {len(done)} trials already complete")
 
-    # Open raw.jsonl in append so we don't clobber prior rows.
     with open(raw_path, "a") as f:
         for frac in args_cli.fractions:
             for seed in args_cli.seeds:

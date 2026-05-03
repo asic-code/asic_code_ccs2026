@@ -1,8 +1,4 @@
-"""IDS MLP model for MANDA.
-
-MLP: input -> hidden(50, ReLU) -> output(2, softmax).
-Per paper: one input layer, one hidden layer with 50 neurons, one output layer.
-"""
+"""IDS MLP model for MANDA: input -> hidden(50, ReLU) -> output(2)."""
 import numpy as np
 import torch
 import torch.nn as nn

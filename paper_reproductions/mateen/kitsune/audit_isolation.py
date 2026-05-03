@@ -1,11 +1,4 @@
-"""Phase 4 isolation audit for the Kitsune dataset-lost ablation.
-
-Verifies:
-  - subsample size  = round(n_train_full * fraction)
-  - same fraction + different seed => DIFFERENT subsample hash
-  - any fraction + ANY seed => SAME test_label_hash (test set fixed)
-  - per-subsample positive count + positive rate
-"""
+"""Isolation audit for the Kitsune dataset-lost ablation."""
 from __future__ import annotations
 import argparse
 
@@ -68,7 +61,7 @@ def main() -> None:
     for (frac,), hs in seen_hashes.items():
         if frac == 1.0:
             ok = (len(hs) == 1)
-            note = ("OK: at 100% all seeds see the SAME rows (only model "
+            note = ("100% across seeds yields the same rows (only model "
                     "init noise differs)") if ok else (
                 "WARN: 100% should give one hash")
             print(f"  fraction=100% : {note}")
@@ -76,7 +69,7 @@ def main() -> None:
             ok = (len(hs) == len(args_cli.seeds))
             print(f"  fraction={frac*100:.1f}% : {len(hs)} unique subsample "
                   f"hash(es) across {len(args_cli.seeds)} seeds "
-                  f"({'OK: distinct' if ok else 'WARN: collisions'})")
+                  f"({'distinct' if ok else 'WARN: collisions'})")
 
     print(f"\n  test_label_hash constant across all trials: {test_lbl_hash}")
 

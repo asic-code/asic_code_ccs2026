@@ -1,11 +1,4 @@
-"""Manifold evaluation via Zhou et al. [43] label propagation.
-
-Uses sklearn's LabelSpreading, which implements the exact algorithm
-(normalized graph Laplacian + closed-form / iterative propagation)
-described in "Learning with local and global consistency" (Zhou et al. 2004).
-
-Because NSL-KDD train has >100k samples, we subsample for tractability.
-"""
+"""Manifold model via sklearn LabelSpreading on a stratified subsample."""
 import numpy as np
 from sklearn.semi_supervised import LabelSpreading
 
@@ -22,7 +15,6 @@ class ManifoldModel:
 
     def fit(self, X_train: np.ndarray, y_train: np.ndarray):
         rng = np.random.default_rng(self.random_state)
-        # Stratified-ish subsample: take n_fit//2 from each class (cap by available)
         idx_pos = np.where(y_train == 1)[0]
         idx_neg = np.where(y_train == 0)[0]
         k = self.n_fit // 2

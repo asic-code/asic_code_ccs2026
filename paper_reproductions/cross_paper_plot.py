@@ -1,11 +1,4 @@
-"""Single-panel academic figure: attack-F1 (solid) and TPR (dashed)
-vs training fraction (log scale, decreasing left → right) for the
-four Phase-4 reproductions.
-
-Outputs:
-  cross_paper_summary.pdf  (vector)
-  cross_paper_summary.png  (300 dpi raster)
-"""
+"""Render the cross-paper attack-F1 + TPR vs training-fraction figure."""
 from __future__ import annotations
 import os
 import csv
@@ -19,7 +12,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 CSV = os.path.join(HERE, "cross_paper_summary_wide.csv")
 
 
-# (work, mode, label, color, marker)
 LINES = [
     ("KitNET / Mirai",       "kitnet",  "KitNET / Mirai",            "#1f77b4", "o"),
     ("Mateen / CICIDS2017",  "mateen",  "Alotaibi et al. / CICIDS2017", "#d62728", "s"),
@@ -35,7 +27,7 @@ def load_wide():
 
 def filter_line(rows, work, mode):
     out = [r for r in rows if r["work"] == work and r["mode"] == mode]
-    out.sort(key=lambda r: -float(r["fraction"]))  # descending
+    out.sort(key=lambda r: -float(r["fraction"]))
     return out
 
 
@@ -75,7 +67,6 @@ def main():
                               if r["tpr_std"] not in ("", "nan") else 0
                               for r in cells]) * 100
 
-        # Solid = F1, dashed = TPR
         ax.errorbar(xs, f1_mean, yerr=f1_std,
                      marker=marker, ls="-", color=color,
                      capsize=2.5, capthick=0.6, lw=1.3,
@@ -86,19 +77,17 @@ def main():
                      markersize=4.5,
                      markerfacecolor="white")
 
-        # one legend entry per work
         work_handles.append(mlines.Line2D(
             [], [], color=color, marker=marker, lw=1.3, ls="-",
             markersize=5.5, label=label,
         ))
 
-    # x-axis: decreasing left → right
     ax.set_xscale("log")
     ax.set_xlabel("Training fraction")
     ax.set_ylabel("Detection performance (%)")
     ax.set_xticks([1.0, 0.50, 0.25, 0.10, 0.05, 0.01])
     ax.set_xticklabels(["100%", "50%", "25%", "10%", "5%", "1%"])
-    ax.set_xlim(1.18, 0.0085)   # inverted limits → high-to-low
+    ax.set_xlim(1.18, 0.0085)
     ax.set_ylim(-3, 103)
     ax.grid(True, which="major", linestyle=":", linewidth=0.6, alpha=0.6)
     ax.grid(False, which="minor")
@@ -106,7 +95,6 @@ def main():
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
 
-    # Single combined legend below the axes (clear of all curves)
     metric_handles = [
         mlines.Line2D([], [], color="black", lw=1.3, ls="-",
                        label="Attack-F1"),

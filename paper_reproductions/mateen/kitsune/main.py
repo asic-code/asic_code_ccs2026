@@ -1,11 +1,4 @@
-"""CLI dispatcher for the Mateen / Kitsune reproduction.
-
-Examples:
-    uv run python main.py sanity                # check data
-    uv run python main.py audit                 # isolation audit
-    uv run python main.py phase3 --init-epochs 100
-    uv run python main.py phase4 --init-epochs 30 --seeds 0 1 2
-"""
+"""CLI dispatcher for the Mateen / Kitsune reproduction."""
 from __future__ import annotations
 import argparse
 import sys

@@ -1,24 +1,6 @@
-"""Phase 4 isolation audit for the dataset-lost ablation.
-
-Re-runs the subsample logic for each (fraction, seed) and prints a
-fresh hash table the user can compare to out/dataset_lost/raw.jsonl.
-
-Checks:
-  - subsample size  = round(n_train_full * fraction)
-  - same fraction + different seed => DIFFERENT subsample hash
-  - any fraction + ANY seed => SAME test_label_hash (test set fixed)
-  - train ↔ test raw-row overlap (informational; CICIDS2017 is
-    time-sorted with no by-construction overlap, but we check)
-  - per-subsample positive count + positive rate (to flag degenerate
-    mono-class subsamples)
-  - feature dimensions are stable across rows (preprocessing fits
-    locally but the column count is invariant)
-"""
+"""Isolation audit for the dataset-lost ablation."""
 from __future__ import annotations
 import argparse
-import hashlib
-import os
-from itertools import product
 
 import numpy as np
 import pandas as pd
@@ -78,21 +60,19 @@ def main() -> None:
     for (frac,), hs in seen_hashes.items():
         if frac == 1.0:
             ok = (len(hs) == 1)
-            note = ("OK: at 100% all seeds see the SAME rows (only model "
+            note = ("100% across seeds yields the same rows (only model "
                     "init noise differs)") if ok else (
-                "WARN: at 100% different seeds give different hashes — "
-                "should not happen with rng.choice(n,n,replace=False)")
+                "WARN: 100% gave different hashes across seeds")
             print(f"  fraction=100% : {note}")
         else:
             ok = (len(hs) == len(args_cli.seeds))
             print(f"  fraction={frac*100:.1f}% : {len(hs)} unique subsample "
                   f"hash(es) across {len(args_cli.seeds)} seeds "
-                  f"({'OK: distinct' if ok else 'WARN: collisions'})")
+                  f"({'distinct' if ok else 'WARN: collisions'})")
 
     print(f"\n  test_label_hash constant across all trials: {test_lbl_hash}")
-    print("\nNote: CICIDS2017 is a time-sorted single CSV; train and test"
-          " come from disjoint contiguous row ranges, so train↔test row"
-          " overlap is 0 by construction (no audit needed).")
+    print("\nNote: CICIDS2017 train/test come from disjoint contiguous row "
+          "ranges in a time-sorted CSV; row overlap is 0 by construction.")
 
 
 if __name__ == "__main__":

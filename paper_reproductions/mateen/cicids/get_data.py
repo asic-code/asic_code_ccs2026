@@ -1,10 +1,4 @@
-"""Extract CICIDS2017/clean_data.csv from the downloaded Datasets.zip.
-
-Mateen authors' Drive folder ships everything in one zip
-(`drive_listing/Datasets.zip`). We only need the CICIDS2017 file for
-this subproject; the Kitsune subproject pulls its own files from the
-same zip if needed.
-"""
+"""Extract CICIDS2017/clean_data.csv from drive_listing/Datasets.zip."""
 from __future__ import annotations
 import os
 import sys
@@ -17,8 +11,6 @@ OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
 def main() -> None:
     if not os.path.exists(ZIP):
-        # Try the unrenamed .part file in case extraction is being run on
-        # a partial download.
         cand = os.path.join(os.path.dirname(ZIP),
                              "Datasets.zipreesotew.part")
         if os.path.exists(cand):
@@ -31,7 +23,6 @@ def main() -> None:
         print(f"Datasets.zip contains {len(names)} entries")
         for n in names:
             print(f"  {n}")
-        # Extract anything under CICIDS2017/
         wanted = [n for n in names if "CICIDS2017" in n
                   and n.endswith(".csv")]
         if not wanted:
@@ -41,7 +32,6 @@ def main() -> None:
         for n in wanted:
             print(f"extracting {n}")
             z.extract(n, OUT)
-    # Normalize to the canonical layout the data_loader expects.
     import shutil
     src_csv = None
     for root, _, files in os.walk(OUT):

@@ -1,15 +1,8 @@
-"""Export Phase-4 attack-F1 + TPR for the four reproductions covered
-in this session (KitNET, Mateen-CICIDS, Mateen-Kitsune, Wang/MANDA)
-into two CSV layouts:
-
-  cross_paper_summary_long.csv  (one row per work × mode × fraction × metric)
-  cross_paper_summary_wide.csv  (one row per work × mode × fraction)
-"""
+"""Aggregate per-trial dataset-lost outputs into long/wide CSVs."""
 from __future__ import annotations
 import csv
 import json
 import os
-from typing import Iterable
 
 import numpy as np
 
@@ -17,7 +10,6 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
-# ---------------------------------------------------------------- KitNET
 def load_kitnet():
     p = os.path.join(HERE, "kitnet", "out", "dataset_lost", "raw.jsonl")
     rows = []
@@ -35,7 +27,6 @@ def load_kitnet():
     return rows
 
 
-# ---------------------------------------------------------------- Mateen-CICIDS
 def load_mateen_cicids():
     p = os.path.join(HERE, "mateen", "cicids", "out", "dataset_lost",
                      "raw.jsonl")
@@ -44,7 +35,7 @@ def load_mateen_cicids():
         r = json.loads(line)
         rows.append({
             "work": "Mateen / CICIDS2017",
-            "mode": r["mode"],   # 'mateen' or 'no_update'
+            "mode": r["mode"],
             "fraction": r["fraction"],
             "seed": r["seed"],
             "attack_f1": r["attack_f1"],
@@ -54,7 +45,6 @@ def load_mateen_cicids():
     return rows
 
 
-# ---------------------------------------------------------------- Mateen-Kitsune
 def load_mateen_kitsune():
     p = os.path.join(HERE, "mateen", "kitsune", "out", "dataset_lost",
                      "raw.jsonl")
@@ -73,13 +63,8 @@ def load_mateen_kitsune():
     return rows
 
 
-# ---------------------------------------------------------------- Wang / MANDA
 def load_wang_manda():
-    """Wang's raw is a per-trial dict with `attacks: {fgsm: {manifold: {...},
-    db: {...}, manda: {...}}, bim: ..., cw: ...}`. We export the MANDA
-    combined detector for each attack as separate 'modes', and the
-    IDS-side TPR/FPR (newly added) as a fourth 'mode'.
-    """
+    """Emit one IDS row + one MANDA row per (trial, attack)."""
     p = os.path.join(HERE, "wang", "out", "dataset_lost",
                      "dataset_lost_raw.json")
     raw = json.load(open(p))
@@ -87,9 +72,6 @@ def load_wang_manda():
     for r in raw:
         if r.get("status") != "ok":
             continue
-        # IDS-side row (positive = attack flow). Compute attack-F1 from
-        # IDS confusion-matrix counts so MANDA-IDS is comparable to the
-        # other works on the same axis.
         if "ids_attack_recall" in r:
             tpr = r["ids_attack_recall"]
             fpr = r["ids_fpr"]
@@ -108,7 +90,6 @@ def load_wang_manda():
                 "tpr": float(tpr),
                 "fpr": float(fpr),
             })
-        # Per-attack MANDA combined (positive = AE)
         for atk in ("fgsm", "bim", "cw"):
             ar = r.get("attacks", {}).get(atk, {})
             if "manda" not in ar:
@@ -121,12 +102,11 @@ def load_wang_manda():
                 "seed": r["seed"],
                 "attack_f1": m["f1"],
                 "tpr": m["recall"],
-                "fpr": float("nan"),  # MANDA evaluated at FPR=5% by op-point
+                "fpr": float("nan"),
             })
     return rows
 
 
-# ---------------------------------------------------------------- combine
 def collect_long():
     rows = []
     rows.extend(load_kitnet())
@@ -137,8 +117,6 @@ def collect_long():
 
 
 def aggregate_wide(rows: list[dict]) -> list[dict]:
-    """Per (work, mode, fraction): compute mean ± std across seeds for
-    attack_f1, tpr, fpr."""
     by_cell: dict = {}
     for r in rows:
         key = (r["work"], r["mode"], r["fraction"])
@@ -172,7 +150,6 @@ def main():
     long_rows = collect_long()
     wide_rows = aggregate_wide(long_rows)
 
-    # Sort wide for readability
     work_order = [
         "KitNET / Mirai",
         "Mateen / CICIDS2017",
@@ -206,7 +183,6 @@ def main():
     print(f"long: {long_path}  ({len(long_rows)} rows)")
     print(f"wide: {wide_path}  ({len(wide_rows)} rows)")
 
-    # Pretty preview: wide
     print("\n=== preview cross_paper_summary_wide.csv ===")
     print(f"{'work':<22} {'mode':<10} {'frac':>7} {'n':>3} | "
           f"{'attack_F1':>14} {'TPR':>14} {'FPR':>14}")
