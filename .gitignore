@@ -1,0 +1,22 @@
+/ccs26_dataset_artifact_files/artifact_data/MiraiBotnet/mirai_train.csv
+/ccs26_dataset_artifact_files/artifact_data/netML/netML_dataset.csv
+/ccs26_dataset_artifact_files_v3_mirai_train/artifact_data/MiraiBotnet/mirai_train.csv
+/ccs26_dataset_artifact_files_v3_mirai_train/artifact_data/netML/netML_dataset.csv
+#*.csv
+/ccs26_dataset_artifact_files/ccs26_dataset_artifact_files_v3/artifact_data/MiraiBotnet/mirai_train.csv
+/ccs26_dataset_artifact_files/ccs26_dataset_artifact_files_v3/artifact_data/netML/netML_dataset.csv
+
+*.pyc
+__pycache__/
+.venv/
+outputs/
+Dataset_ex/
+Dataset_Paral/
+Dataset_ISV_turnmap/
+Seperate_Attack_Ex/
+
+# rule_eval_c
+rule_eval_c/rule_eval_c.egg-info/*
+rule_eval_c/*.pyd
+rule_eval_c/*.so
+rule_eval_c/build/
